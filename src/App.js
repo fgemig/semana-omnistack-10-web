@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { Component } from 'react';
+import { debounce } from 'lodash';
 import api from './services/api';
 
 import './global.css';
@@ -8,44 +9,82 @@ import './main.css';
 
 import DevItem from './components/DevItem';
 import DevForm from './components/DevForm';
+import Search from './components/Search';
 
-function App() {
+class App extends Component {
 
-  const [devs, setDevs] = useState([]);
+  constructor(props) {
+    super(props);
 
-  useEffect(() => {
-    async function loadDevs() {
-      const response = await api.get('/devs');
-      setDevs(response.data);
+    this.state = {
+      devs: []
+    }
+  }
+
+  async componentDidMount() {
+
+    const devs = await this.loadDevs();
+
+    this.setState({
+      devs: devs
+    });
+  }
+
+  loadDevs = async (search) => {
+    console.log('chamou: ' + search);
+    const response = await api.get('/devs');
+
+    let data = response.data;
+
+    if (search != null) {
+      if (search !== ''){
+        data = data.filter((dev) => {
+          return dev.github_username.toLowerCase().includes(search?.toLowerCase());
+        });
+      }
     }
 
-    loadDevs();
-  }, []);
+    return data;
+  }
 
-  async function handleAddDev(data) {
-   
+  handleAddDev = async (data) => {
+
     const response = await api.post('/devs', data);
 
-    setDevs([...devs, response.data.dev]);
-}
+    this.setState({
+      devs: [...this.state.devs, response.data.dev]
+    });
+  }
 
-  return (
-    <div id="app">
-      <aside>
-        <strong>Cadastrar</strong>
-        <DevForm onSubmit={handleAddDev} />
-      </aside>
+  handleSearchDev = debounce(async (data) => {
+    
+    let devs = await this.loadDevs(data);
 
-      <main>
-        <ul>
-          {devs.map(dev => (
-            <DevItem key={dev._id} dev={dev} />
-          ))}
-        </ul>
-      </main>
+      this.setState({
+        devs: devs
+      });
+  }, 2000);
 
-    </div >
-  );
+  render() {
+    return (
+      <div id="app">
+        <aside>
+          <strong>Cadastrar</strong>
+          <DevForm onSubmit={this.handleAddDev} />
+        </aside>
+
+        <main>
+          <Search searchText={this.handleSearchDev} />
+          <ul>
+            {this.state.devs.map(dev => (
+              <DevItem key={dev._id} dev={dev} />
+            ))}
+          </ul>
+        </main>
+
+      </div >
+    );
+  }
 }
 
 export default App;
